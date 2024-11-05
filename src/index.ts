@@ -3,12 +3,6 @@ export const createErrorClass =
   <ClassName extends string>(className: ClassName) => {
     type Reason = keyof ReasonContextMap;
 
-    // We need to use this trick for the type predicate
-    // to work correctly
-    type ErrorClassInterface = Error & {
-      reason: Reason;
-    };
-
     type AdditionalInfo<SpecificReason extends Reason> = {
       reason: SpecificReason;
       cause?: Error;
@@ -18,10 +12,7 @@ export const createErrorClass =
           context: ReasonContextMap[SpecificReason];
         });
 
-    const ErrorClass = class<SpecificReason extends Reason>
-      extends Error
-      implements ErrorClassInterface
-    {
+    const ErrorClass = class<SpecificReason extends Reason> extends Error {
       constructor(
         message: string,
         { reason, cause }: AdditionalInfo<SpecificReason>,
@@ -39,6 +30,18 @@ export const createErrorClass =
     // As a class (which is actually just a function) name is readonly,
     // we need to use definedProperty in order to set it
     Object.defineProperty(ErrorClass, "name", { value: className });
+
+    // We need to use this trick for the type predicate
+    // to work correctly
+    type UnionToDiscriminatedUnion<SpecificReason extends Reason> =
+      SpecificReason extends string
+        ? {
+            reason: SpecificReason;
+            context: ReasonContextMap[SpecificReason];
+          }
+        : never;
+
+    type ErrorClassInterface = Error & UnionToDiscriminatedUnion<Reason>;
 
     const isErrorClass = (value: unknown): value is ErrorClassInterface =>
       value instanceof ErrorClass;
